@@ -1,8 +1,8 @@
-"use client"
+"use client";
 
 import { useState, useRef } from "react";
 import * as XLSX from "xlsx";
-import { CloudUpload } from "lucide-react"; // Ícone de upload
+import { CloudUpload, Download, Trash2 } from "lucide-react";
 
 export default function SorteioExcel() {
   const [data, setData] = useState<any[]>([]);
@@ -14,7 +14,7 @@ export default function SorteioExcel() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    setFileName(file.name); // Salva o nome do arquivo para exibir
+    setFileName(file.name);
 
     const reader = new FileReader();
     reader.readAsBinaryString(file);
@@ -26,69 +26,149 @@ export default function SorteioExcel() {
       const sheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[sheetName];
 
-      const jsonData = XLSX.utils.sheet_to_json(sheet);
-      setData(jsonData);
+      const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+      if (jsonData.length >= 3 && Array.isArray(jsonData[2])) {
+        const headers = jsonData[2].map((header) => String(header).trim());
+        const formattedData = jsonData.slice(3).map(row => {
+          if (!Array.isArray(row)) return {};
+
+          const obj: any = {};
+          headers.forEach((header: string, index: number) => {
+            obj[header] = row[index] !== undefined ? row[index] : "";
+          });
+          return obj;
+        });
+
+        setData(formattedData);
+      } else {
+        console.error("Erro ao processar o arquivo: a terceira linha não contém cabeçalhos válidos.");
+      }
     };
+  };
+
+  const handleDeleteFile = () => {
+    setFileName(null);
+    setData([]);
+    setWinners([]);
   };
 
   const handleSorteio = () => {
     if (data.length === 0) return;
 
-    const pendenteItems = data.filter(item => item["Serial"] === "PENDENTE");
-    const normalItems = data.filter(item => item["Serial"] != "PENDENTE");
-
-    // Calcular a quantidade mínima de itens com cota (20%)
-    const minPendenteCount = Math.floor(quantidade * 0.2);
-    const pendenteToSelect = Math.min(minPendenteCount, pendenteItems.length);
-
-    // Garantir que pelo menos `minPendenteCount` itens "PENDENTE" sejam sorteados
-    let selectedItems: any[] = [...pendenteItems.slice(0, pendenteToSelect)];
-
-    // Calcular a quantidade restante para completar o sorteio
-    const remainingCount = quantidade - selectedItems.length;
-
-    // Embaralhar os itens restantes (sem duplicação) e adicionar ao sorteio
-    const remainingItems = [...normalItems, ...pendenteItems.slice(pendenteToSelect)];
-    const shuffledRemaining = remainingItems.sort(() => Math.random() - 0.5);
-
-    // Selecionar os itens restantes, sem repetir
-    const selectedRemainingItems = shuffledRemaining.slice(0, remainingCount);
-
-    // Garantir que não haja duplicatas no sorteio
-    selectedItems = [...selectedItems, ...selectedRemainingItems];
-
-    // Garantir que o total de sorteados seja exatamente igual à quantidade solicitada
-    selectedItems = selectedItems.slice(0, quantidade);
-
-    // Embaralhar todos os sorteados para aleatoriedade total
-    selectedItems.sort(() => Math.random() - 0.5);
+    const shuffledData = [...data].sort(() => Math.random() - 0.5);
+    const selectedItems = shuffledData.slice(0, quantidade);
 
     setWinners(selectedItems);
   };
 
-  // Obter os nomes das colunas a partir da primeira linha
-  const columnNames = data[0] ? Object.keys(data[0]) : [];
+  const exportToExcel = () => {
+    if (winners.length === 0) return;
+  
+    // Criar um array com os dados formatados para texto em números grandes
+    const dataWithTextFormat = winners.map(item => {
+      const newItem: { [key: string]: any } = {};  // Inicializa newItem com uma tipagem mais segura
+  
+      columnNames.forEach(col => {
+        newItem[col] = typeof item[col] === 'number' && item[col] > 9999999999
+          ? String(item[col])  // Converte números grandes em texto
+          : item[col];
+      });
+  
+      return newItem;
+    });
+  
+    // Criar um array que inclui os cabeçalhos como primeira linha
+    const headers = [columnNames];
+    const dataWithHeaders = [...headers, ...dataWithTextFormat.map(item => columnNames.map(col => item[col] || ""))];
+  
+    // Criar a planilha com os dados formatados
+    const worksheet = XLSX.utils.aoa_to_sheet(dataWithHeaders);
+  
+    // Estilizar a primeira linha (cabeçalhos) com fundo verde claro
+    const range = XLSX.utils.decode_range(worksheet["!ref"] || "A1");
+  
+    // Estilizando os cabeçalhos na primeira linha
+    for (let col = range.s.c; col <= range.e.c; col++) {
+      const cellAddress = XLSX.utils.encode_col(col) + "0"; // Linha 0 para cabeçalhos
+      if (worksheet[cellAddress]) {
+        worksheet[cellAddress].s = {
+          fill: { fgColor: { rgb: "D9EAD3" } }, // Cor de fundo verde claro
+          font: { bold: true, color: { rgb: "FFFFFF" }, size: 12 }, // Texto branco e negrito
+          alignment: { horizontal: "center", vertical: "center" }, // Alinhamento centralizado
+          border: { 
+            top: { style: "thin", color: { rgb: "000000" } },
+            left: { style: "thin", color: { rgb: "000000" } },
+            bottom: { style: "thin", color: { rgb: "000000" } },
+            right: { style: "thin", color: { rgb: "000000" } }
+          } // Bordas finas
+        };
+      }
+    }
+  
+    // Estilo para as células de dados (cor alternada, alinhamento à esquerda e bordas)
+    for (let row = 1; row <= range.e.r; row++) {
+      for (let col = range.s.c; col <= range.e.c; col++) {
+        const cellAddress = XLSX.utils.encode_col(col) + row; // Para cada linha de dados
+        if (worksheet[cellAddress]) {
+          worksheet[cellAddress].s = {
+            fill: {
+              fgColor: row % 2 === 0 ? { rgb: "F4F4F4" } : { rgb: "FFFFFF" }, // Cor de fundo alternada
+            },
+            alignment: { horizontal: "left" }, // Alinhamento à esquerda
+            border: {
+              top: { style: "thin", color: { rgb: "000000" } },
+              left: { style: "thin", color: { rgb: "000000" } },
+              bottom: { style: "thin", color: { rgb: "000000" } },
+              right: { style: "thin", color: { rgb: "000000" } }
+            } // Bordas finas
+          };
+        }
+      }
+    }
+  
+    // Criar e salvar o arquivo Excel
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Sorteados");
+  
+    // Adicionar as configurações de largura de colunas se necessário
+    worksheet['!cols'] = columnNames.map(col => ({
+      wch: col.length + 5 // Ajuste a largura de cada coluna com base no nome da coluna
+    }));
+  
+    XLSX.writeFile(workbook, "sorteio_resultado.xlsx");
+  };
+  
+  
+  
 
+  const columnNames = data[0] ? Object.keys(data[0]) : [];
   const botaoRef = useRef<HTMLButtonElement>(null);
 
   const handleKeyUp = (event: { key: string; preventDefault: () => void; }) => {
-      if (event.key === 'Enter') {
-          event.preventDefault();
-          botaoRef.current?.click();
-      }
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      botaoRef.current?.click();
+    }
   };
 
   return (
     <div className="p-6 bg-gray-100 min-h-screen flex flex-col items-center">
       <div className="bg-white shadow-md rounded-lg p-6 w-full max-w-lg">
-        {/* Botão de Upload de Arquivo */}
-        <label className="cursor-pointer flex flex-col items-center justify-center w-full border-2 border-dashed border-gray-400 rounded-lg py-6 bg-gray-50 hover:bg-gray-100 transition">
-          <CloudUpload size={40} className="text-blue-500 mb-2" />
-          <span className="text-gray-600 font-semibold">
-            {fileName ? `📂 ${fileName}` : "Clique para enviar um arquivo"}
-          </span>
-          <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} className="hidden" />
-        </label>
+        <div className="flex items-center justify-between w-full">
+          <label className="cursor-pointer flex flex-col items-center justify-center w-full border-2 border-dashed border-gray-400 rounded-lg py-6 bg-gray-50 hover:bg-gray-100 transition">
+            <CloudUpload size={40} className="text-blue-500 mb-2" />
+            <span className="text-gray-600 font-semibold">
+              {fileName ? `📂 ${fileName}` : "Clique para enviar um arquivo"}
+            </span>
+            <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} className="hidden" />
+          </label>
+          {fileName && (
+            <button onClick={handleDeleteFile} className="ml-4 text-red-500 hover:text-red-700">
+              <Trash2 size={24} />
+            </button>
+          )}
+        </div>
 
         {data.length > 0 && (
           <div className="mt-4">
@@ -114,9 +194,12 @@ export default function SorteioExcel() {
 
       {winners.length > 0 && (
         <div className="mt-6 bg-white shadow-md rounded-lg p-6 w-full min-h-full">
-          <h2 className="text-xl font-bold text-green-600 text-center">Sorteados</h2>
-
-          {/* Tabela com rolagem horizontal apenas se necessário */}
+          <div className="flex justify-end">
+            <button onClick={exportToExcel} className="w-26 px-4 py-2 mt-4 bg-green-500 text-white rounded font-semibold hover:bg-green-600 transition flex items-center justify-center">
+              <Download size={20} className="mr-2" /> Exportar para Excel
+            </button>
+          </div>
+          <h2 className="text-3xl mb-4 font-bold text-green-600 text-center">Sorteados</h2>
           <div className="w-full overflow-x-auto">
             <table className="w-full border-collapse border border-gray-300">
               <thead>
