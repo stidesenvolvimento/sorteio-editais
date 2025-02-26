@@ -2,50 +2,72 @@
 
 import { useState, useRef } from "react";
 import * as XLSX from "xlsx";
-import { CloudUpload, Download} from "lucide-react";
+import { CloudUpload, Download } from "lucide-react";
 
 export default function SorteioExcel() {
-  const [data, setData] = useState<any[]>([]);
-  const [winners, setWinners] = useState<any[]>([]);
+  const [data, setData] = useState<Record<string, unknown>[]>([]);
+  const [winners, setWinners] = useState<Record<string, unknown>[]>([]);
   const [quantidade, setQuantidade] = useState(1);
   const [fileName, setFileName] = useState<string | null>(null);
 
+  const colunasDesejadas = [
+    "Nº Inscrição", 
+    "Carimbo de data/hora", 
+    "Tipo de Inscrição", 
+    "Nome Completo da Pessoa Proponente", 
+    "Nome Social da Pessoa Proponente", 
+    "Nº de CPF da Pessoa Proponente", 
+    "Nº de CNPJ da Pessoa Proponente", 
+    "Qual é a categoria da atividade?", 
+    "Qual é a modalidade da atividade?", 
+    "Nome da atividade", 
+    "Nome da/o Artista/Liderança do Grupo", 
+    "Nome Completo da/o Artista/Liderança do Grupo"
+  ];
+
+  
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-
+  
     setFileName(file.name);
-
+  
     const reader = new FileReader();
     reader.readAsBinaryString(file);
-
+  
     reader.onload = (e) => {
       const binaryString = e.target?.result;
       const workbook = XLSX.read(binaryString, { type: "binary" });
-
+  
       const sheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[sheetName];
-
+  
       const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-
+  
       if (jsonData.length >= 3 && Array.isArray(jsonData[2])) {
         const headers = jsonData[2].map((header) => String(header).trim());
+  
+        // Filtra apenas as colunas que você precisa
+        const filteredHeaders = headers.filter(header => colunasDesejadas.includes(header));
+        
         const formattedData = jsonData.slice(3).map(row => {
           if (!Array.isArray(row)) return {};
-
-          const obj: any = {};
-          headers.forEach((header: string, index: number) => {
-            obj[header] = row[index] !== undefined ? row[index] : "";
+  
+          const obj: { [key: string]: unknown } = {};
+          filteredHeaders.forEach((header: string) => {
+            const colIndex = headers.indexOf(header);
+            obj[header] = row[colIndex] !== undefined ? row[colIndex] : "";
           });
           return obj;
         });
-
+  
         setData(formattedData);
       } else {
         console.error("Erro ao processar o arquivo: a terceira linha não contém cabeçalhos válidos.");
       }
     };
   };
+  
 
   const handleSorteio = () => {
     if (data.length === 0) return;
@@ -58,85 +80,74 @@ export default function SorteioExcel() {
 
   const exportToExcel = () => {
     if (winners.length === 0) return;
-  
-    // Criar um array com os dados formatados para texto em números grandes
-    const dataWithTextFormat = winners.map(item => {
-      const newItem: { [key: string]: any } = {};  // Inicializa newItem com uma tipagem mais segura
-  
+
+    const dataWithTextFormat = winners.map((item: Record<string, unknown>) => {
+      const newItem: Record<string, unknown> = {};
+
       columnNames.forEach(col => {
         newItem[col] = typeof item[col] === 'number' && item[col] > 9999999999
-          ? String(item[col])  // Converte números grandes em texto
+          ? String(item[col])
           : item[col];
       });
-  
+
       return newItem;
     });
-  
-    // Criar um array que inclui os cabeçalhos como primeira linha
+
     const headers = [columnNames];
     const dataWithHeaders = [...headers, ...dataWithTextFormat.map(item => columnNames.map(col => item[col] || ""))];
-  
-    // Criar a planilha com os dados formatados
+
     const worksheet = XLSX.utils.aoa_to_sheet(dataWithHeaders);
-  
-    // Estilizar a primeira linha (cabeçalhos) com fundo verde claro
+
     const range = XLSX.utils.decode_range(worksheet["!ref"] || "A1");
-  
-    // Estilizando os cabeçalhos na primeira linha
+
     for (let col = range.s.c; col <= range.e.c; col++) {
-      const cellAddress = XLSX.utils.encode_col(col) + "0"; // Linha 0 para cabeçalhos
+      const cellAddress = XLSX.utils.encode_col(col) + "0";
       if (worksheet[cellAddress]) {
         worksheet[cellAddress].s = {
-          fill: { fgColor: { rgb: "D9EAD3" } }, // Cor de fundo verde claro
-          font: { bold: true, color: { rgb: "FFFFFF" }, size: 12 }, // Texto branco e negrito
-          alignment: { horizontal: "center", vertical: "center" }, // Alinhamento centralizado
-          border: { 
+          fill: { fgColor: { rgb: "D9EAD3" } },
+          font: { bold: true, color: { rgb: "FFFFFF" }, size: 12 },
+          alignment: { horizontal: "center", vertical: "center" },
+          border: {
             top: { style: "thin", color: { rgb: "000000" } },
             left: { style: "thin", color: { rgb: "000000" } },
             bottom: { style: "thin", color: { rgb: "000000" } },
             right: { style: "thin", color: { rgb: "000000" } }
-          } // Bordas finas
+          }
         };
       }
     }
-  
-    // Estilo para as células de dados (cor alternada, alinhamento à esquerda e bordas)
+
     for (let row = 1; row <= range.e.r; row++) {
       for (let col = range.s.c; col <= range.e.c; col++) {
-        const cellAddress = XLSX.utils.encode_col(col) + row; // Para cada linha de dados
+        const cellAddress = XLSX.utils.encode_col(col) + row;
         if (worksheet[cellAddress]) {
           worksheet[cellAddress].s = {
             fill: {
-              fgColor: row % 2 === 0 ? { rgb: "F4F4F4" } : { rgb: "FFFFFF" }, // Cor de fundo alternada
+              fgColor: row % 2 === 0 ? { rgb: "F4F4F4" } : { rgb: "FFFFFF" },
             },
-            alignment: { horizontal: "left" }, // Alinhamento à esquerda
+            alignment: { horizontal: "left" },
             border: {
               top: { style: "thin", color: { rgb: "000000" } },
               left: { style: "thin", color: { rgb: "000000" } },
               bottom: { style: "thin", color: { rgb: "000000" } },
               right: { style: "thin", color: { rgb: "000000" } }
-            } // Bordas finas
+            }
           };
         }
       }
     }
-  
-    // Criar e salvar o arquivo Excel
+
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Sorteados");
-  
-    // Adicionar as configurações de largura de colunas se necessário
+
     worksheet['!cols'] = columnNames.map(col => ({
-      wch: col.length + 5 // Ajuste a largura de cada coluna com base no nome da coluna
+      wch: col.length + 5
     }));
-  
+
     XLSX.writeFile(workbook, "sorteio_resultado.xlsx");
   };
-  
-  
-  
 
-  const columnNames = data[0] ? Object.keys(data[0]) : [];
+  const columnNames: string[] = data[0] ? Object.keys(data[0]) : [];
   const botaoRef = useRef<HTMLButtonElement>(null);
 
   const handleKeyUp = (event: { key: string; preventDefault: () => void; }) => {
@@ -199,14 +210,25 @@ export default function SorteioExcel() {
                 </tr>
               </thead>
               <tbody>
-                {winners.map((item, index) => (
-                  <tr key={index} className="border text-black">
-                    {columnNames.map((column, colIndex) => (
-                      <td key={colIndex} className="border p-2">{item[column] || "Sem valor"}</td>
-                    ))}
+                {winners.length === 0 ? (
+                  <tr>
+                    <td colSpan={columnNames.length} className="text-center p-2">Nenhum sorteado</td>
                   </tr>
-                ))}
+                ) : (
+                  winners.map((item, index) => (
+                    <tr key={index} className="border text-black">
+                      {columnNames.map((column, colIndex) => {
+                        // Garantir que item[column] seja renderizável (string, número, etc.)
+                        const cellValue = item[column] ?? "Sem valor";  // Se item[column] for null ou undefined, coloca "Sem valor"
+                        return (
+                          <td key={colIndex} className="border p-2">{String(cellValue)}</td>  // Garantir que é uma string renderizável
+                        );
+                      })}
+                    </tr>
+                  ))
+                )}
               </tbody>
+
             </table>
           </div>
         </div>
