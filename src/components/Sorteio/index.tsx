@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import * as XLSX from "xlsx";
-import { CloudUpload, Download, Trash2 } from "lucide-react";
+import { CloudUpload, Download} from "lucide-react";
 
 export default function SorteioExcel() {
   const [data, setData] = useState<any[]>([]);
@@ -45,12 +45,6 @@ export default function SorteioExcel() {
         console.error("Erro ao processar o arquivo: a terceira linha não contém cabeçalhos válidos.");
       }
     };
-  };
-
-  const handleDeleteFile = () => {
-    setFileName(null);
-    setData([]);
-    setWinners([]);
   };
 
   const handleSorteio = () => {
