@@ -163,11 +163,6 @@ export default function SorteioExcel() {
             </span>
             <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} className="hidden" />
           </label>
-          {fileName && (
-            <button onClick={handleDeleteFile} className="ml-4 text-red-500 hover:text-red-700">
-              <Trash2 size={24} />
-            </button>
-          )}
         </div>
 
         {data.length > 0 && (
