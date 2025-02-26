@@ -11,6 +11,7 @@ export default function SorteioExcel() {
   const [fileName, setFileName] = useState<string | null>(null);
 
 
+  
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -51,10 +52,24 @@ export default function SorteioExcel() {
   
             // Se a coluna for "Carimbo de data/hora", formate a data
             if (header === "Carimbo de data/hora" && cellValue) {
-              const date = new Date(cellValue);
-              if (!isNaN(date.getTime())) { // Verifica se é uma data válida
+              let dateValue: Date;
+  
+              // Caso a célula seja um número (data numérica do Excel)
+              if (typeof cellValue === "number") {
+                // Converte o número para data, considerando que o Excel armazena datas como números de série
+                dateValue = new Date((cellValue - 25569) * 86400000); // Subtrai 25569 e converte para milissegundos
+              } else {
+                // Caso seja uma string ou outro tipo, tenta criar um objeto Date
+                dateValue = new Date(cellValue);
+              }
+  
+              // Verifica se é uma data válida
+              if (!isNaN(dateValue.getTime())) {
                 // Formata a data no formato dd/mm/yyyy hh:mm:ss
-                cellValue = `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`;
+                cellValue = `${String(dateValue.getDate()).padStart(2, '0')}/${String(dateValue.getMonth() + 1).padStart(2, '0')}/${dateValue.getFullYear()} ${String(dateValue.getHours()).padStart(2, '0')}:${String(dateValue.getMinutes()).padStart(2, '0')}:${String(dateValue.getSeconds()).padStart(2, '0')}`;
+              } else {
+                // Se não for uma data válida, coloca uma mensagem de erro
+                cellValue = "Data inválida";
               }
             }
   
@@ -76,10 +91,6 @@ export default function SorteioExcel() {
   
   
   
-  
-  
-
-
 
 
   const handleSorteio = () => {
