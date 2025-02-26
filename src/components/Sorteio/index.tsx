@@ -11,21 +11,20 @@ export default function SorteioExcel() {
   const [fileName, setFileName] = useState<string | null>(null);
 
   const colunasDesejadas = [
-    "Nº Inscrição", 
-    "Carimbo de data/hora", 
-    "Tipo de Inscrição", 
-    "Nome Completo da Pessoa Proponente", 
-    "Nome Social da Pessoa Proponente", 
-    "Nº de CPF da Pessoa Proponente", 
-    "Nº de CNPJ da Pessoa Proponente", 
-    "Qual é a categoria da atividade?", 
-    "Qual é a modalidade da atividade?", 
-    "Nome da atividade", 
-    "Nome da/o Artista/Liderança do Grupo", 
+    "Nº Inscrição",
+    "Tipo de Inscrição",
+    "Nome Completo da Pessoa Proponente",
+    "Nome Social da Pessoa Proponente",
+    "Nº de CPF da Pessoa Proponente",
+    "Nº de CNPJ da Pessoa Proponente",
+    "Qual é a categoria da atividade?",
+    "Qual é a modalidade da atividade?",
+    "Nome da atividade",
+    "Nome da/o Artista/Liderança do Grupo",
     "Nome Completo da/o Artista/Liderança do Grupo"
   ];
 
-  
+
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -47,19 +46,40 @@ export default function SorteioExcel() {
       if (jsonData.length >= 3 && Array.isArray(jsonData[2])) {
         const headers = jsonData[2].map((header) => String(header).trim());
   
-        // Filtra apenas as colunas que você precisa
-        const filteredHeaders = headers.filter(header => colunasDesejadas.includes(header));
-        
-        const formattedData = jsonData.slice(3).map(row => {
-          if (!Array.isArray(row)) return {};
+        console.log('Headers:', headers); // Para depuração
   
-          const obj: { [key: string]: unknown } = {};
-          filteredHeaders.forEach((header: string) => {
-            const colIndex = headers.indexOf(header);
-            obj[header] = row[colIndex] !== undefined ? row[colIndex] : "";
+        // Organize os dados, incluindo o número da linha
+        const formattedData = jsonData.slice(3).map((row, rowIndex) => {
+          if (!Array.isArray(row)) return {};  // Garante que a linha seja um array
+  
+          // Verifica se a linha está vazia (não contém dados significativos)
+          const isEmpty = row.every(cell => cell === undefined || cell === null || cell === "");
+  
+          if (isEmpty) return null; // Ignora linhas vazias
+  
+          const obj: { [key: string]: unknown } = { 'Número da Linha': rowIndex + 4 }; // Começa da linha 4 da planilha
+  
+          // Mapeando todas as colunas da planilha
+          headers.forEach((header, colIndex) => {
+            let cellValue = row[colIndex];
+  
+            // Se a coluna for "Carimbo de data/hora", formate a data
+            if (header === "Carimbo de data/hora" && cellValue) {
+              const date = new Date(cellValue);
+              if (!isNaN(date.getTime())) { // Verifica se é uma data válida
+                // Formata a data no formato dd/mm/yyyy hh:mm:ss
+                cellValue = `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`;
+              }
+            }
+  
+            obj[header] = cellValue !== undefined ? cellValue : ""; // Atribui o valor ou uma string vazia
           });
+  
           return obj;
-        });
+        }).filter(row => row !== null); // Remove as linhas que foram ignoradas
+  
+        // Se quiser verificar os dados antes de exibir:
+        console.log('Formatted Data:', formattedData);
   
         setData(formattedData);
       } else {
@@ -68,6 +88,13 @@ export default function SorteioExcel() {
     };
   };
   
+  
+  
+  
+  
+
+
+
 
   const handleSorteio = () => {
     if (data.length === 0) return;
@@ -202,32 +229,34 @@ export default function SorteioExcel() {
           <h2 className="text-3xl mb-4 font-bold text-green-600 text-center">Sorteados</h2>
           <div className="w-full overflow-x-auto">
             <table className="w-full border-collapse border border-gray-300">
-              <thead>
-                <tr className="bg-blue-500">
-                  {columnNames.map((column, index) => (
-                    <th key={index} className="border p-2 text-left text-white">{column}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {winners.length === 0 ? (
-                  <tr>
-                    <td colSpan={columnNames.length} className="text-center p-2">Nenhum sorteado</td>
-                  </tr>
-                ) : (
-                  winners.map((item, index) => (
-                    <tr key={index} className="border text-black">
-                      {columnNames.map((column, colIndex) => {
-                        // Garantir que item[column] seja renderizável (string, número, etc.)
-                        const cellValue = item[column] ?? "Sem valor";  // Se item[column] for null ou undefined, coloca "Sem valor"
-                        return (
-                          <td key={colIndex} className="border p-2">{String(cellValue)}</td>  // Garantir que é uma string renderizável
-                        );
-                      })}
-                    </tr>
-                  ))
-                )}
-              </tbody>
+            <thead>
+  <tr className="bg-blue-500">
+    {columnNames.map((column, index) => (
+      <th key={index} className="border p-2 text-left text-white">{column}</th>
+    ))}
+  </tr>
+</thead>
+<tbody>
+  {winners.length === 0 ? (
+    <tr>
+      <td colSpan={columnNames.length} className="text-center p-2">Nenhum sorteado</td>
+    </tr>
+  ) : (
+    winners.map((item, index) => (
+      <tr key={index} className="border text-black">
+        {columnNames.map((column, colIndex) => {
+          const cellValue = item[column] ?? "Sem valor";  // Se item[column] for null ou undefined, coloca "Sem valor"
+          return (
+            <td key={colIndex} className="border p-2">{String(cellValue)}</td>  // Garantir que é uma string renderizável
+          );
+        })}
+      </tr>
+    ))
+  )}
+</tbody>
+
+
+
 
             </table>
           </div>
