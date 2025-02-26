@@ -10,20 +10,6 @@ export default function SorteioExcel() {
   const [quantidade, setQuantidade] = useState(1);
   const [fileName, setFileName] = useState<string | null>(null);
 
-  const colunasDesejadas = [
-    "Nº Inscrição",
-    "Tipo de Inscrição",
-    "Nome Completo da Pessoa Proponente",
-    "Nome Social da Pessoa Proponente",
-    "Nº de CPF da Pessoa Proponente",
-    "Nº de CNPJ da Pessoa Proponente",
-    "Qual é a categoria da atividade?",
-    "Qual é a modalidade da atividade?",
-    "Nome da atividade",
-    "Nome da/o Artista/Liderança do Grupo",
-    "Nome Completo da/o Artista/Liderança do Grupo"
-  ];
-
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
