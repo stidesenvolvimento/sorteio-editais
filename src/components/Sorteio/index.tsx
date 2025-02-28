@@ -30,64 +30,60 @@ export default function SorteioExcel() {
   
       const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
   
-      if (jsonData.length >= 3 && Array.isArray(jsonData[2])) {
-        const headers = jsonData[2].map((header) => String(header).trim());
+      if (jsonData.length < 2) {
+        console.error("O arquivo não tem cabeçalhos na linha 2.");
+        return;
+      }
   
-        console.log('Headers:', headers); // Para depuração
+      // Pegando os cabeçalhos da **segunda linha** (índice 1 no array)
+      const headers = (jsonData[1] as (string | undefined)[]).map(header =>
+        header ? String(header).trim() : ""
+      );
   
-        // Organize os dados, incluindo o número da linha
-        const formattedData = jsonData.slice(3).map((row, rowIndex) => {
-          if (!Array.isArray(row)) return {};  // Garante que a linha seja um array
+      console.log("Headers encontrados:", headers);
   
-          // Verifica se a linha está vazia (não contém dados significativos)
-          const isEmpty = row.every(cell => cell === undefined || cell === null || cell === "");
+      // Processar todas as linhas a partir da **terceira linha** (índice 2 no array)
+      const formattedData = jsonData.slice(2).map((row, rowIndex) => {
+        if (!Array.isArray(row)) return {};  
   
-          if (isEmpty) return null; // Ignora linhas vazias
+        const obj: { [key: string]: unknown } = { 'Número da Linha': rowIndex + 3 }; // Ajuste do número da linha
   
-          const obj: { [key: string]: unknown } = { 'Número da Linha': rowIndex + 4 }; // Começa da linha 4 da planilha
+        headers.forEach((header, colIndex) => {
+          let cellValue = row[colIndex];
   
-          // Mapeando todas as colunas da planilha
-          headers.forEach((header, colIndex) => {
-            let cellValue = row[colIndex];
+          // Tratamento de números grandes como strings
+          if (typeof cellValue === "number" && cellValue > 1e12) {
+            cellValue = cellValue.toString();
+          }
   
-            // Se a coluna for "Carimbo de data/hora", formate a data
-            if (header === "Carimbo de data/hora" && cellValue) {
-              let dateValue: Date;
+          // Conversão de datas para um formato legível
+          if (header === "Carimbo de data/hora" && cellValue) {
+            let dateValue: Date;
   
-              // Caso a célula seja um número (data numérica do Excel)
-              if (typeof cellValue === "number") {
-                // Converte o número para data, considerando que o Excel armazena datas como números de série
-                dateValue = new Date((cellValue - 25569) * 86400000); // Subtrai 25569 e converte para milissegundos
-              } else {
-                // Caso seja uma string ou outro tipo, tenta criar um objeto Date
-                dateValue = new Date(cellValue);
-              }
-  
-              // Verifica se é uma data válida
-              if (!isNaN(dateValue.getTime())) {
-                // Formata a data no formato dd/mm/yyyy hh:mm:ss
-                cellValue = `${String(dateValue.getDate()).padStart(2, '0')}/${String(dateValue.getMonth() + 1).padStart(2, '0')}/${dateValue.getFullYear()} ${String(dateValue.getHours()).padStart(2, '0')}:${String(dateValue.getMinutes()).padStart(2, '0')}:${String(dateValue.getSeconds()).padStart(2, '0')}`;
-              } else {
-                // Se não for uma data válida, coloca uma mensagem de erro
-                cellValue = "Data inválida";
-              }
+            if (typeof cellValue === "number") {
+              dateValue = new Date((cellValue - 25569) * 86400000);
+            } else {
+              dateValue = new Date(cellValue);
             }
   
-            obj[header] = cellValue !== undefined ? cellValue : ""; // Atribui o valor ou uma string vazia
-          });
+            if (!isNaN(dateValue.getTime())) {
+              cellValue = `${String(dateValue.getDate()).padStart(2, '0')}/${String(dateValue.getMonth() + 1).padStart(2, '0')}/${dateValue.getFullYear()} ${String(dateValue.getHours()).padStart(2, '0')}:${String(dateValue.getMinutes()).padStart(2, '0')}:${String(dateValue.getSeconds()).padStart(2, '0')}`;
+            } else {
+              cellValue = "Data inválida";
+            }
+          }
   
-          return obj;
-        }).filter(row => row !== null); // Remove as linhas que foram ignoradas
+          obj[header] = cellValue !== undefined ? cellValue : "";
+        });
   
-        // Se quiser verificar os dados antes de exibir:
-        console.log('Formatted Data:', formattedData);
+        return obj;
+      });
   
-        setData(formattedData);
-      } else {
-        console.error("Erro ao processar o arquivo: a terceira linha não contém cabeçalhos válidos.");
-      }
+      console.log("Formatted Data:", formattedData);
+      setData(formattedData);
     };
   };
+  
   
   
   
@@ -242,9 +238,9 @@ export default function SorteioExcel() {
     winners.map((item, index) => (
       <tr key={index} className="border text-black">
         {columnNames.map((column, colIndex) => {
-          const cellValue = item[column] ?? "Sem valor";  // Se item[column] for null ou undefined, coloca "Sem valor"
+          const cellValue = item[column] ?? "Sem valor";  
           return (
-            <td key={colIndex} className="border p-2">{String(cellValue)}</td>  // Garantir que é uma string renderizável
+            <td key={colIndex} className="border p-2">{String(cellValue)}</td>  
           );
         })}
       </tr>
