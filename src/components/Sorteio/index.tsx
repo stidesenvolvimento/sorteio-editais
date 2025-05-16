@@ -30,60 +30,53 @@ export default function SorteioExcel() {
   
       const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
   
-      if (jsonData.length < 2) {
-        console.error("O arquivo não tem cabeçalhos na linha 2.");
-        return;
+      if (jsonData.length >= 3 && Array.isArray(jsonData[2])) {
+        const headers = jsonData[2].map((header) => String(header).trim());
+  
+        console.log('Headers:', headers);
+  
+        const formattedData = jsonData.slice(3).map((row, rowIndex) => {
+          if (!Array.isArray(row)) return {};  
+  
+          const isEmpty = row.every(cell => cell === undefined || cell === null || cell === "");
+  
+          if (isEmpty) return null; 
+  
+          const obj: { [key: string]: unknown } = { 'Número da Linha': rowIndex + 4 }; 
+  
+          headers.forEach((header, colIndex) => {
+            let cellValue = row[colIndex];
+  
+            if (header === "Carimbo de data/hora" && cellValue) {
+              let dateValue: Date;
+  
+              if (typeof cellValue === "number") {
+                dateValue = new Date((cellValue - 25569) * 86400000); 
+              } else {
+                dateValue = new Date(cellValue);
+              }
+  
+              if (!isNaN(dateValue.getTime())) {
+                cellValue = `${String(dateValue.getDate()).padStart(2, '0')}/${String(dateValue.getMonth() + 1).padStart(2, '0')}/${dateValue.getFullYear()} ${String(dateValue.getHours()).padStart(2, '0')}:${String(dateValue.getMinutes()).padStart(2, '0')}:${String(dateValue.getSeconds()).padStart(2, '0')}`;
+              } else {
+                cellValue = "Data inválida";
+              }
+            }
+  
+            obj[header] = cellValue !== undefined ? cellValue : ""; 
+          });
+  
+          return obj;
+        }).filter(row => row !== null); 
+  
+        console.log('Formatted Data:', formattedData);
+  
+        setData(formattedData);
+      } else {
+        console.error("Erro ao processar o arquivo: a terceira linha não contém cabeçalhos válidos.");
       }
-  
-      // Pegando os cabeçalhos da **segunda linha** (índice 1 no array)
-      const headers = (jsonData[1] as (string | undefined)[]).map(header =>
-        header ? String(header).trim() : ""
-      );
-  
-      console.log("Headers encontrados:", headers);
-  
-      // Processar todas as linhas a partir da **terceira linha** (índice 2 no array)
-      const formattedData = jsonData.slice(2).map((row, rowIndex) => {
-        if (!Array.isArray(row)) return {};  
-  
-        const obj: { [key: string]: unknown } = { 'Número da Linha': rowIndex + 3 }; // Ajuste do número da linha
-  
-        headers.forEach((header, colIndex) => {
-          let cellValue = row[colIndex];
-  
-          // Tratamento de números grandes como strings
-          if (typeof cellValue === "number" && cellValue > 1e12) {
-            cellValue = cellValue.toString();
-          }
-  
-          // Conversão de datas para um formato legível
-          if (header === "Carimbo de data/hora" && cellValue) {
-            let dateValue: Date;
-  
-            if (typeof cellValue === "number") {
-              dateValue = new Date((cellValue - 25569) * 86400000);
-            } else {
-              dateValue = new Date(cellValue);
-            }
-  
-            if (!isNaN(dateValue.getTime())) {
-              cellValue = `${String(dateValue.getDate()).padStart(2, '0')}/${String(dateValue.getMonth() + 1).padStart(2, '0')}/${dateValue.getFullYear()} ${String(dateValue.getHours()).padStart(2, '0')}:${String(dateValue.getMinutes()).padStart(2, '0')}:${String(dateValue.getSeconds()).padStart(2, '0')}`;
-            } else {
-              cellValue = "Data inválida";
-            }
-          }
-  
-          obj[header] = cellValue !== undefined ? cellValue : "";
-        });
-  
-        return obj;
-      });
-  
-      console.log("Formatted Data:", formattedData);
-      setData(formattedData);
     };
   };
-  
   
   
   
