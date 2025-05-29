@@ -4,83 +4,88 @@ import { useState, useRef } from "react";
 import * as XLSX from "xlsx";
 import { CloudUpload, Download } from "lucide-react";
 
+// Função para mascarar CPF
+function maskCPF(cpf: string): string {
+  const cleaned = cpf.replace(/\D/g, '');
+
+  if (cleaned.length !== 11) return cpf;
+
+  return `***.${cleaned.slice(3, 6)}.${cleaned.slice(6, 9)}-***`;
+}
+
 export default function SorteioExcel() {
   const [data, setData] = useState<Record<string, unknown>[]>([]);
   const [winners, setWinners] = useState<Record<string, unknown>[]>([]);
   const [quantidade, setQuantidade] = useState(1);
   const [fileName, setFileName] = useState<string | null>(null);
 
+  const botaoRef = useRef<HTMLButtonElement>(null);
 
-  
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-  
+
     setFileName(file.name);
-  
+
     const reader = new FileReader();
     reader.readAsBinaryString(file);
-  
+
     reader.onload = (e) => {
       const binaryString = e.target?.result;
       const workbook = XLSX.read(binaryString, { type: "binary" });
-  
+
       const sheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[sheetName];
-  
+
       const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-  
-      if (jsonData.length >= 3 && Array.isArray(jsonData[2])) {
-        const headers = jsonData[2].map((header) => String(header).trim());
-  
-        console.log('Headers:', headers);
-  
-        const formattedData = jsonData.slice(3).map((row, rowIndex) => {
-          if (!Array.isArray(row)) return {};  
-  
-          const isEmpty = row.every(cell => cell === undefined || cell === null || cell === "");
-  
-          if (isEmpty) return null; 
-  
-          const obj: { [key: string]: unknown } = { 'Número da Linha': rowIndex + 4 }; 
-  
-          headers.forEach((header, colIndex) => {
-            let cellValue = row[colIndex];
-  
-            if (header === "Carimbo de data/hora" && cellValue) {
-              let dateValue: Date;
-  
-              if (typeof cellValue === "number") {
-                dateValue = new Date((cellValue - 25569) * 86400000); 
-              } else {
-                dateValue = new Date(cellValue);
+
+      const headerRowIndex = 1; // 🔥 Ajuste aqui se o cabeçalho mudar de linha
+      if (jsonData.length >= headerRowIndex + 1 && Array.isArray(jsonData[headerRowIndex])) {
+        const headers = jsonData[headerRowIndex].map((header) => String(header).trim());
+
+        const formattedData = jsonData
+          .slice(headerRowIndex + 1)
+          .map((row, rowIndex) => {
+            if (!Array.isArray(row)) return {};
+
+            const isEmpty = row.every(cell => cell === undefined || cell === null || cell === "");
+
+            if (isEmpty) return null;
+
+            const obj: { [key: string]: unknown } = { 'Número da Linha': rowIndex + headerRowIndex + 2 };
+
+            headers.forEach((header, colIndex) => {
+              let cellValue = row[colIndex];
+
+              if (header === "Carimbo de data/hora" && cellValue) {
+                let dateValue: Date;
+
+                if (typeof cellValue === "number") {
+                  dateValue = new Date((cellValue - 25569) * 86400000);
+                } else {
+                  dateValue = new Date(cellValue);
+                }
+
+                if (!isNaN(dateValue.getTime())) {
+                  cellValue = `${String(dateValue.getDate()).padStart(2, '0')}/${String(dateValue.getMonth() + 1).padStart(2, '0')}/${dateValue.getFullYear()} ${String(dateValue.getHours()).padStart(2, '0')}:${String(dateValue.getMinutes()).padStart(2, '0')}:${String(dateValue.getSeconds()).padStart(2, '0')}`;
+                } else {
+                  cellValue = "Data inválida";
+                }
               }
-  
-              if (!isNaN(dateValue.getTime())) {
-                cellValue = `${String(dateValue.getDate()).padStart(2, '0')}/${String(dateValue.getMonth() + 1).padStart(2, '0')}/${dateValue.getFullYear()} ${String(dateValue.getHours()).padStart(2, '0')}:${String(dateValue.getMinutes()).padStart(2, '0')}:${String(dateValue.getSeconds()).padStart(2, '0')}`;
-              } else {
-                cellValue = "Data inválida";
-              }
-            }
-  
-            obj[header] = cellValue !== undefined ? cellValue : ""; 
-          });
-  
-          return obj;
-        }).filter(row => row !== null); 
-  
-        console.log('Formatted Data:', formattedData);
-  
-        setData(formattedData);
+
+              obj[header] = cellValue !== undefined ? cellValue : "";
+            });
+
+            return obj;
+          })
+          .filter(row => row !== null);
+
+        setData(formattedData as Record<string, unknown>[]);
       } else {
-        console.error("Erro ao processar o arquivo: a terceira linha não contém cabeçalhos válidos.");
+        console.error("Erro ao processar o arquivo: a linha de cabeçalho não é válida.");
       }
     };
   };
-  
-  
-  
-
 
   const handleSorteio = () => {
     if (data.length === 0) return;
@@ -98,58 +103,28 @@ export default function SorteioExcel() {
       const newItem: Record<string, unknown> = {};
 
       columnNames.forEach(col => {
-        newItem[col] = typeof item[col] === 'number' && item[col] > 9999999999
-          ? String(item[col])
-          : item[col];
+        let value = item[col];
+
+        // Se for CPF, aplica a máscara
+        if (col.toLowerCase().includes('cpf') && typeof value === 'string') {
+          value = maskCPF(value);
+        }
+
+        newItem[col] = typeof value === 'number' && value > 9999999999
+          ? String(value)
+          : value;
       });
 
       return newItem;
     });
 
     const headers = [columnNames];
-    const dataWithHeaders = [...headers, ...dataWithTextFormat.map(item => columnNames.map(col => item[col] || ""))];
+    const dataWithHeaders = [
+      ...headers,
+      ...dataWithTextFormat.map(item => columnNames.map(col => item[col] || ""))
+    ];
 
     const worksheet = XLSX.utils.aoa_to_sheet(dataWithHeaders);
-
-    const range = XLSX.utils.decode_range(worksheet["!ref"] || "A1");
-
-    for (let col = range.s.c; col <= range.e.c; col++) {
-      const cellAddress = XLSX.utils.encode_col(col) + "0";
-      if (worksheet[cellAddress]) {
-        worksheet[cellAddress].s = {
-          fill: { fgColor: { rgb: "D9EAD3" } },
-          font: { bold: true, color: { rgb: "FFFFFF" }, size: 12 },
-          alignment: { horizontal: "center", vertical: "center" },
-          border: {
-            top: { style: "thin", color: { rgb: "000000" } },
-            left: { style: "thin", color: { rgb: "000000" } },
-            bottom: { style: "thin", color: { rgb: "000000" } },
-            right: { style: "thin", color: { rgb: "000000" } }
-          }
-        };
-      }
-    }
-
-    for (let row = 1; row <= range.e.r; row++) {
-      for (let col = range.s.c; col <= range.e.c; col++) {
-        const cellAddress = XLSX.utils.encode_col(col) + row;
-        if (worksheet[cellAddress]) {
-          worksheet[cellAddress].s = {
-            fill: {
-              fgColor: row % 2 === 0 ? { rgb: "F4F4F4" } : { rgb: "FFFFFF" },
-            },
-            alignment: { horizontal: "left" },
-            border: {
-              top: { style: "thin", color: { rgb: "000000" } },
-              left: { style: "thin", color: { rgb: "000000" } },
-              bottom: { style: "thin", color: { rgb: "000000" } },
-              right: { style: "thin", color: { rgb: "000000" } }
-            }
-          };
-        }
-      }
-    }
-
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Sorteados");
 
@@ -161,7 +136,6 @@ export default function SorteioExcel() {
   };
 
   const columnNames: string[] = data[0] ? Object.keys(data[0]) : [];
-  const botaoRef = useRef<HTMLButtonElement>(null);
 
   const handleKeyUp = (event: { key: string; preventDefault: () => void; }) => {
     if (event.key === 'Enter') {
@@ -184,66 +158,74 @@ export default function SorteioExcel() {
         </div>
 
         {data.length > 0 && (
-          <div className="mt-4">
-            <label className="block font-semibold mb-1 text-black">Quantidade de sorteados:</label>
-            <input
-              type="number"
-              min="1"
-              max={data.length}
-              value={quantidade}
-              onChange={(e) => setQuantidade(Number(e.target.value))}
-              className="border p-2 w-full rounded text-black"
-              onKeyUp={handleKeyUp}
-            />
-          </div>
-        )}
-
-        {data.length > 0 && (
-          <button onClick={handleSorteio} ref={botaoRef} className="w-full px-4 py-2 mt-4 bg-blue-500 text-white rounded font-semibold hover:bg-blue-600 transition">
-            Sortear
-          </button>
+          <>
+            <div className="mt-4">
+              <label className="block font-semibold mb-1 text-black">Quantidade de sorteados:</label>
+              <input
+                type="number"
+                min="1"
+                max={data.length}
+                value={quantidade}
+                onChange={(e) => setQuantidade(Number(e.target.value))}
+                className="border p-2 w-full rounded text-black"
+                onKeyUp={handleKeyUp}
+              />
+            </div>
+            <button
+              onClick={handleSorteio}
+              ref={botaoRef}
+              className="w-full px-4 py-2 mt-4 bg-blue-500 text-white rounded font-semibold hover:bg-blue-600 transition"
+            >
+              Sortear
+            </button>
+          </>
         )}
       </div>
 
       {winners.length > 0 && (
         <div className="mt-6 bg-white shadow-md rounded-lg p-6 w-full min-h-full">
           <div className="flex justify-end">
-            <button onClick={exportToExcel} className="w-26 px-4 py-2 mt-4 bg-green-500 text-white rounded font-semibold hover:bg-green-600 transition flex items-center justify-center">
+            <button
+              onClick={exportToExcel}
+              className="w-26 px-4 py-2 mt-4 bg-green-500 text-white rounded font-semibold hover:bg-green-600 transition flex items-center justify-center"
+            >
               <Download size={20} className="mr-2" /> Exportar para Excel
             </button>
           </div>
           <h2 className="text-3xl mb-4 font-bold text-green-600 text-center">Sorteados</h2>
           <div className="w-full overflow-x-auto">
             <table className="w-full border-collapse border border-gray-300">
-            <thead>
-  <tr className="bg-blue-500">
-    {columnNames.map((column, index) => (
-      <th key={index} className="border p-2 text-left text-white">{column}</th>
-    ))}
-  </tr>
-</thead>
-<tbody>
-  {winners.length === 0 ? (
-    <tr>
-      <td colSpan={columnNames.length} className="text-center p-2">Nenhum sorteado</td>
-    </tr>
-  ) : (
-    winners.map((item, index) => (
-      <tr key={index} className="border text-black">
-        {columnNames.map((column, colIndex) => {
-          const cellValue = item[column] ?? "Sem valor";  
-          return (
-            <td key={colIndex} className="border p-2">{String(cellValue)}</td>  
-          );
-        })}
-      </tr>
-    ))
-  )}
-</tbody>
+              <thead>
+                <tr className="bg-blue-500">
+                  {columnNames.map((column, index) => (
+                    <th key={index} className="border p-2 text-left text-white">{column}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {winners.length === 0 ? (
+                  <tr>
+                    <td colSpan={columnNames.length} className="text-center p-2">Nenhum sorteado</td>
+                  </tr>
+                ) : (
+                  winners.map((item, index) => (
+                    <tr key={index} className="border text-black">
+                      {columnNames.map((column, colIndex) => {
+                        let cellValue = item[column] ?? "Sem valor";
 
+                        // Verifica se é CPF
+                        if (column.toLowerCase().includes('cpf') && typeof cellValue === 'string') {
+                          cellValue = maskCPF(cellValue);
+                        }
 
-
-
+                        return (
+                          <td key={colIndex} className="border p-2">{String(cellValue)}</td>
+                        );
+                      })}
+                    </tr>
+                  ))
+                )}
+              </tbody>
             </table>
           </div>
         </div>
