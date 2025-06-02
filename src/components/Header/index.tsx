@@ -1,17 +1,23 @@
 "use client";
 
 import Image from "next/image";
-import logoSMC from "@/assets/logo_smc.png";
+import logoSMC from "@/assets/logo_smc_preto.png";
+import logoSorteio from "@/assets/logo_sorteio.png";
 import Link from "next/link";
 
 export default function Header() {
     return (
-        <header className="bg-gray-100 text-black">
-            <div className="bg-white shadow-md rounded-lg w-full min-h-full flex flex-row items-center justify-between px-6 md:px-36 py-4">
-                <div className="flex items-center space-x-4 justify-between w-full">
+        <header className="bg-white/55 bg-transparent-5 text-black">
+            <div className="shadow-md rounded-lg w-full flex flex-row items-center justify-between px-6 md:px-36 py-4">
+                <div className="flex items-center flex-col md:flex-row space-x-4 justify-between w-full">
                     <div>
                         <Link href="#" onClick={() => window.location.reload()}>
-                            <h1 className="text-2xl md:text-3xl font-bold text-blue-600">Sorteio Editais</h1>
+                            <Image
+                                alt="Logo da SMC"
+                                src={logoSorteio}
+                                quality={100}
+                                className="object-contain md:w-52 scale-[0.9]"
+                            />
                         </Link>
                     </div>
                     <div>
@@ -20,7 +26,7 @@ export default function Header() {
                                 alt="Logo da SMC"
                                 src={logoSMC}
                                 quality={100}
-                                className="object-contain w-40 md:w-52 h-auto"
+                                className="object-contain md:w-52 md:scale-[2] scale-150"
                             />
                         </Link>
                     </div>

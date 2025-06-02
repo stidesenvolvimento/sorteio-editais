@@ -11,11 +11,12 @@
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --azul: #4B8AC7;
   }
 }
 
 body {
   color: var(--foreground);
-  background: var(--background);
+  @apply bg-[url('/assets/background.jpg')] bg-cover bg-center bg-fixed;
   font-family: Arial, Helvetica, sans-serif;
 }

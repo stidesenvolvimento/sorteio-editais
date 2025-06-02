@@ -4,13 +4,14 @@ import { useState, useRef } from "react";
 import * as XLSX from "xlsx";
 import { CloudUpload, Download } from "lucide-react";
 
-// Função para mascarar CPF
-function maskCPF(cpf: string): string {
-  const cleaned = cpf.replace(/\D/g, '');
+// Função para mascarar CPF - agora aceita string ou número e converte para string internamente
+function maskCPF(cpf: string | number): string {
+  const strCpf = String(cpf);  // <-- Garantindo que seja string
+  const cleaned = strCpf.replace(/\D/g, '');
 
-  if (cleaned.length !== 11) return cpf;
+  if (cleaned.length !== 11) return strCpf;
 
-  return `***.${cleaned.slice(3, 6)}.${cleaned.slice(6, 9)}-***`;
+  return `***.${cleaned.slice(3, 6)}.${cleaned.slice(7, 9)}*-**`;
 }
 
 export default function SorteioExcel() {
@@ -105,10 +106,11 @@ export default function SorteioExcel() {
       columnNames.forEach(col => {
         let value = item[col];
 
-        // Se for CPF, aplica a máscara
-        if (col.toLowerCase().includes('cpf') && typeof value === 'string') {
-          value = maskCPF(value);
+        // Se for CPF, aplica a máscara - agora sempre converte para string
+        if (col.toLowerCase().includes('cpf') && value != null) {
+          value = maskCPF(String(value));
         }
+
 
         newItem[col] = typeof value === 'number' && value > 9999999999
           ? String(value)
@@ -145,7 +147,7 @@ export default function SorteioExcel() {
   };
 
   return (
-    <div className="p-6 bg-gray-100 min-h-screen flex flex-col items-center">
+    <div className="p-6 flex flex-col items-center">
       <div className="bg-white shadow-md rounded-lg p-6 w-full max-w-lg">
         <div className="flex items-center justify-between w-full">
           <label className="cursor-pointer flex flex-col items-center justify-center w-full border-2 border-dashed border-gray-400 rounded-lg py-6 bg-gray-50 hover:bg-gray-100 transition">
@@ -192,8 +194,8 @@ export default function SorteioExcel() {
               <Download size={20} className="mr-2" /> Exportar para Excel
             </button>
           </div>
-          <h2 className="text-3xl mb-4 font-bold text-green-600 text-center">Sorteados</h2>
-          <div className="w-full overflow-x-auto">
+          <h2 className="text-4xl mb-4 font-bold text-green-600 text-center font-anton tracking-wide">Resultado do Sorteio</h2>
+          <div className="w-full overflow-x-auto rounded-lg">
             <table className="w-full border-collapse border border-gray-300">
               <thead>
                 <tr className="bg-blue-500">
@@ -209,13 +211,13 @@ export default function SorteioExcel() {
                   </tr>
                 ) : (
                   winners.map((item, index) => (
-                    <tr key={index} className="border text-black">
+                    <tr key={index} className="border text-black ">
                       {columnNames.map((column, colIndex) => {
                         let cellValue = item[column] ?? "Sem valor";
 
-                        // Verifica se é CPF
-                        if (column.toLowerCase().includes('cpf') && typeof cellValue === 'string') {
-                          cellValue = maskCPF(cellValue);
+                        // Verifica se é CPF - agora sempre converte para string antes de mascarar
+                        if (column.toLowerCase().includes('cpf') && cellValue != null) {
+                          cellValue = maskCPF(String(cellValue));
                         }
 
                         return (
