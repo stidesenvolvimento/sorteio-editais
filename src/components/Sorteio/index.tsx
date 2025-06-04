@@ -40,7 +40,7 @@ export default function SorteioExcel() {
 
       const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-      const headerRowIndex = 1; // 🔥 Ajuste aqui se o cabeçalho mudar de linha
+      const headerRowIndex = 0; // Ajuste aqui se o cabeçalho mudar de linha
       if (jsonData.length >= headerRowIndex + 1 && Array.isArray(jsonData[headerRowIndex])) {
         const headers = jsonData[headerRowIndex].map((header) => String(header).trim());
 
@@ -211,7 +211,7 @@ export default function SorteioExcel() {
                   </tr>
                 ) : (
                   winners.map((item, index) => (
-                    <tr key={index} className="border text-black ">
+                    <tr key={index} className="border text-black hover:bg-gray-100">
                       {columnNames.map((column, colIndex) => {
                         let cellValue = item[column] ?? "Sem valor";
 
